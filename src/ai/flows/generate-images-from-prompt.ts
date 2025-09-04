@@ -22,6 +22,7 @@ const GenerateImagesFromPromptInputSchema = z.object({
   prompt: z.string().describe('The prompt to use for image generation.'),
   modelGender: z.enum(['Male', 'Female']).optional().describe('The gender of the model, if applicable.'),
   modelAvatar: z.string().optional().describe('The data URI of the model avatar, if applicable.'),
+  numImages: z.number().min(1).max(6).default(6).describe('The number of images to generate.'),
 });
 export type GenerateImagesFromPromptInput = z.infer<typeof GenerateImagesFromPromptInputSchema>;
 
@@ -44,21 +45,29 @@ const generateImagesFromPromptFlow = ai.defineFlow(
   },
   async input => {
     const generatedImages: string[] = [];
-    for (let i = 0; i < 6; i++) {
-      const {media} = await ai.generate({
-        model: 'googleai/gemini-2.5-flash-image-preview',
-        prompt: [
-          {media: {url: input.productImageDataUri}},
-          {text: input.prompt},
-        ],
-        config: {
-          responseModalities: ['TEXT', 'IMAGE'],
-        },
-      });
-      if (media) {
-        generatedImages.push(media.url);
-      }
+    const imagePromises = [];
+
+    for (let i = 0; i < input.numImages; i++) {
+        imagePromises.push(ai.generate({
+            model: 'googleai/gemini-2.5-flash-image-preview',
+            prompt: [
+              {media: {url: input.productImageDataUri}},
+              {text: input.prompt},
+            ],
+            config: {
+              responseModalities: ['TEXT', 'IMAGE'],
+            },
+        }));
     }
+
+    const results = await Promise.all(imagePromises);
+
+    for (const result of results) {
+        if (result.media) {
+            generatedImages.push(result.media.url);
+        }
+    }
+
     return {generatedImages};
   }
 );

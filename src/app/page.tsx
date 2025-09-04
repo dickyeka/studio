@@ -27,6 +27,7 @@ import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { Slider } from '@/components/ui/slider';
 
 import { ImageUpload } from '@/components/image-upload';
 import { displayApiStatus } from '@/ai/flows/display-api-status';
@@ -77,6 +78,7 @@ export default function ProductStudioPage() {
   );
   const [theme, setTheme] = useState<string>(THEMES[0]);
   const [lighting, setLighting] = useState<string>(LIGHTING_STYLES[0]);
+  const [numImages, setNumImages] = useState(6);
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [apiStatus, setApiStatus] = useState<{
@@ -133,6 +135,7 @@ export default function ProductStudioPage() {
         prompt: prompt,
         modelGender: mode === 'lookbook' ? selectedGender : undefined,
         modelAvatar: mode === 'lookbook' ? modelImage?.data : undefined,
+        numImages: numImages,
       });
 
       if (result.generatedImages && result.generatedImages.length > 0) {
@@ -306,6 +309,20 @@ export default function ProductStudioPage() {
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-4">
+          <div className="flex justify-between items-center">
+            <Label htmlFor="num-images-slider">Number of Images</Label>
+            <span className="font-bold text-lg">{numImages}</span>
+          </div>
+          <Slider
+            id="num-images-slider"
+            min={1}
+            max={6}
+            step={1}
+            value={[numImages]}
+            onValueChange={(value) => setNumImages(value[0])}
+          />
+        </div>
       </div>
       
       <Button
@@ -329,7 +346,7 @@ export default function ProductStudioPage() {
       <h2 className="font-headline text-3xl mb-6">Results</h2>
        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {isLoading &&
-          Array.from({ length: 6 }).map((_, i) => (
+          Array.from({ length: numImages }).map((_, i) => (
             <Skeleton key={i} className="aspect-[3/4] rounded-lg" />
           ))}
         {!isLoading && generatedImages.length === 0 && (
