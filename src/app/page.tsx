@@ -2,20 +2,21 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { FC } from 'react';
-import Image from 'next/image';
 import {
   CheckCircle2,
   XCircle,
   Loader,
   Sparkles,
-  Download,
   PartyPopper,
   Moon,
   Sun,
+  RefreshCw,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -37,8 +38,9 @@ import { displayApiStatus } from '@/ai/flows/display-api-status';
 import { generateImagesFromPrompt } from '@/ai/flows/generate-images-from-prompt';
 
 type Mode = 'lookbook' | 'b-roll';
-type Gender = 'Male' | 'Female';
 type ThemeMode = 'dark' | 'light';
+type ImageRatio = '1:1' | '4:3' | '16:9' | '3:4' | '9:16';
+type Gender = 'male' | 'female';
 
 const THEMES = [
   'Studio Professional', 'Urban Street Style', 'Outdoor Lifestyle', 'Minimalist & Artsy',
@@ -48,8 +50,21 @@ const LIGHTING_STYLES = [
   'Studio Lighting', 'Natural Daylight', 'Golden Hour', 'Dramatic Shadows',
   'Soft Diffused', 'Neon Urban', 'Moody Dark', 'Bright & Airy'
 ];
-const MALE_MODELS = ['👨🏻', '👨🏼', '👨🏽', '👨🏾', '👨🏿', '🧔🏻‍♂️'];
-const FEMALE_MODELS = ['👩🏻', '👩🏼', '👩🏽', '👩🏾', '👩🏿', '👱‍♀️'];
+const IMAGE_RATIOS = [
+  { value: '1:1', label: 'Square (1:1)', description: 'Perfect for Instagram posts' },
+  { value: '4:3', label: 'Standard (4:3)', description: 'Classic photography format' },
+  { value: '16:9', label: 'Widescreen (16:9)', description: 'Cinematic landscape' },
+  { value: '3:4', label: 'Portrait (3:4)', description: 'Vertical composition' },
+  { value: '9:16', label: 'Mobile (9:16)', description: 'Instagram Stories/TikTok' },
+];
+
+const MALE_MODELS = [
+  '👨‍💼', '🧔', '👨‍🎨', '👨‍💻', '🧑‍🦱', '👨‍🦲', '👨‍🦳', '🧑‍🦰'
+];
+
+const FEMALE_MODELS = [
+  '👩‍💼', '👩‍🎨', '👩‍💻', '👩‍🦱', '👩‍🦲', '👩‍🦳', '👩‍🦰', '👸'
+];
 
 const GlassCard: FC<{ children: React.ReactNode; className?: string }> = ({
   children,
@@ -78,19 +93,21 @@ export default function ProductStudioPage() {
     data: string;
     name: string;
   } | null>(null);
-  const [selectedGender, setSelectedGender] = useState<Gender>('Female');
-  const [selectedAvatar, setSelectedAvatar] = useState<string>(
-    FEMALE_MODELS[0]
-  );
   const [theme, setTheme] = useState<string>(THEMES[0]);
   const [lighting, setLighting] = useState<string>(LIGHTING_STYLES[0]);
+  const [imageRatio, setImageRatio] = useState<ImageRatio>('4:3');
   const [numImages, setNumImages] = useState(6);
+  const [selectedGender, setSelectedGender] = useState<Gender>('female');
+  const [selectedModelAvatar, setSelectedModelAvatar] = useState<string>('👩‍💼');
   const [generatedImages, setGeneratedImages] = useState<string[]>([]);
+  const [generatedPrompts, setGeneratedPrompts] = useState<string[]>([]);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [apiStatus, setApiStatus] = useState<{
     isConnected: boolean;
     message?: string;
   } | null>(null);
+  const [isCheckingApi, setIsCheckingApi] = useState(false);
 
   useEffect(() => {
     document.documentElement.className = themeMode;
@@ -98,6 +115,7 @@ export default function ProductStudioPage() {
 
   useEffect(() => {
     const checkApi = async () => {
+      setIsCheckingApi(true);
       try {
         const status = await displayApiStatus();
         setApiStatus({
@@ -109,10 +127,60 @@ export default function ProductStudioPage() {
           isConnected: false,
           message: 'Failed to connect to API.',
         });
+      } finally {
+        setIsCheckingApi(false);
       }
     };
     checkApi();
   }, []);
+
+  const handleRefreshApiStatus = async () => {
+    setIsCheckingApi(true);
+    try {
+      const status = await displayApiStatus();
+      setApiStatus({
+        isConnected: status.isConnected,
+        message: status.errorMessage,
+      });
+      toast({
+        title: status.isConnected ? 'API Connected' : 'API Disconnected',
+        description: status.errorMessage || (status.isConnected ? 'API is working properly' : 'Please check your configuration'),
+        variant: status.isConnected ? 'default' : 'destructive',
+      });
+    } catch (error) {
+      setApiStatus({
+        isConnected: false,
+        message: 'Failed to connect to API.',
+      });
+      toast({
+        title: 'API Check Failed',
+        description: 'Unable to check API status',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsCheckingApi(false);
+    }
+  };
+
+  const handleCopyPrompt = async (prompt: string, index: number) => {
+    try {
+      // Only Gemini format - clean prompt text
+      await navigator.clipboard.writeText(prompt);
+      setCopiedIndex(index);
+      toast({
+        title: '300-Word Prompt Copied!',
+        description: 'The detailed prompt with image reference has been copied and is ready for use.',
+      });
+      // Reset copied state after 2 seconds
+      setTimeout(() => setCopiedIndex(null), 2000);
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: 'Copy Failed',
+        description: 'Unable to copy prompt to clipboard.',
+      });
+    }
+  };
 
   const handleGenerate = async () => {
     if (!productImage) {
@@ -125,38 +193,41 @@ export default function ProductStudioPage() {
     }
     setIsLoading(true);
     setGeneratedImages([]);
+    setGeneratedPrompts([]);
+    setCopiedIndex(null);
 
-    let prompt = `Generate a high-resolution, photorealistic image. Theme: ${theme}. Lighting: ${lighting}.`;
+    const selectedRatioInfo = IMAGE_RATIOS.find(r => r.value === imageRatio);
+    let prompt = `${theme} style, ${lighting}, ${imageRatio} format`;
     if (mode === 'lookbook') {
-        prompt += ` This is a lookbook shoot.`;
         if (modelImage) {
-            prompt += ` The model should resemble the person in the provided model photo.`;
+            prompt += `, custom model`;
         } else {
-            prompt += ` Feature a ${selectedGender.toLowerCase()} model.`;
+            prompt += `, ${selectedGender} model`;
         }
     } else {
-        prompt += ` This is a B-roll product shot. Focus on a dynamic and appealing presentation of the product in a lifestyle context.`;
+        prompt += `, product focus, lifestyle context`;
     }
-    prompt += ` Ensure the final image is polished, professional, and unique in composition.`
 
     try {
       const result = await generateImagesFromPrompt({
         productImageDataUri: productImage.data,
         prompt: prompt,
+        imageRatio: imageRatio,
+        modelAvatar: mode === 'lookbook' ? (modelImage?.data || selectedModelAvatar) : undefined,
         modelGender: mode === 'lookbook' ? selectedGender : undefined,
-        modelAvatar: mode === 'lookbook' ? modelImage?.data : undefined,
         numImages: numImages,
       });
 
       if (result.generatedImages && result.generatedImages.length > 0) {
         setGeneratedImages(result.generatedImages);
+        setGeneratedPrompts(result.generatedPrompts || []);
         toast({
-            title: 'Success!',
-            description: 'Your images have been generated.',
+            title: '300-Word Prompts Generated!',
+            description: `${result.generatedPrompts?.length || numImages} detailed 300-word prompts with image references ready.`,
             action: <PartyPopper className="text-accent" />,
           });
       } else {
-        throw new Error('The AI returned no images. Please try again.');
+        throw new Error('The AI returned no results. Please try again.');
       }
     } catch (error) {
       console.error(error);
@@ -171,17 +242,6 @@ export default function ProductStudioPage() {
     }
   };
 
-  const currentModels = useMemo(
-    () => (selectedGender === 'Male' ? MALE_MODELS : FEMALE_MODELS),
-    [selectedGender]
-  );
-
-  useEffect(() => {
-    if (!modelImage) {
-      setSelectedAvatar(currentModels[0]);
-    }
-  }, [currentModels, modelImage]);
-  
   const ControlPanel = () => (
     <GlassCard className="p-6 space-y-8 sticky top-8">
       <div>
@@ -229,61 +289,80 @@ export default function ProductStudioPage() {
           onImageRemove={() => setProductImage(null)}
         />
         {mode === 'lookbook' && (
-          <ImageUpload
-            label="Custom Model (Optional)"
-            preview={modelImage?.data ?? null}
-            onImageUpload={(data, name) => setModelImage({ data, name })}
-            onImageRemove={() => setModelImage(null)}
-          />
+          <>
+            <ImageUpload
+              label="Custom Model (Optional)"
+              preview={modelImage?.data ?? null}
+              onImageUpload={(data, name) => setModelImage({ data, name })}
+              onImageRemove={() => setModelImage(null)}
+            />
+            {!modelImage && (
+              <div className="space-y-4">
+                <h4 className="text-md font-headline">Model Selection</h4>
+                <div className="space-y-3">
+                  <Label>Gender</Label>
+                  <RadioGroup
+                    value={selectedGender}
+                    onValueChange={(value: string) => {
+                      const gender = value as Gender;
+                      setSelectedGender(gender);
+                      // Set default avatar for selected gender
+                      setSelectedModelAvatar(gender === 'male' ? MALE_MODELS[0] : FEMALE_MODELS[0]);
+                    }}
+                    className="flex gap-4"
+                  >
+                    <Label
+                      htmlFor="female"
+                      className={cn(
+                        'p-3 rounded-lg border-2 text-center cursor-pointer transition-all flex-1',
+                        selectedGender === 'female'
+                          ? 'bg-primary/20 border-primary'
+                          : 'border-transparent hover:bg-white/10 dark:hover:bg-white/10'
+                      )}
+                    >
+                      <RadioGroupItem value="female" id="female" className="sr-only" />
+                      Female
+                    </Label>
+                    <Label
+                      htmlFor="male"
+                      className={cn(
+                        'p-3 rounded-lg border-2 text-center cursor-pointer transition-all flex-1',
+                        selectedGender === 'male'
+                          ? 'bg-primary/20 border-primary'
+                          : 'border-transparent hover:bg-white/10 dark:hover:bg-white/10'
+                      )}
+                    >
+                      <RadioGroupItem value="male" id="male" className="sr-only" />
+                      Male
+                    </Label>
+                  </RadioGroup>
+                </div>
+                <div className="space-y-3">
+                  <Label>Model Avatar</Label>
+                  <div className="grid grid-cols-4 gap-2">
+                    {(selectedGender === 'male' ? MALE_MODELS : FEMALE_MODELS).map((avatar, index) => (
+                      <Button
+                        key={index}
+                        variant="outline"
+                        size="lg"
+                        className={cn(
+                          'h-12 text-2xl',
+                          selectedModelAvatar === avatar
+                            ? 'bg-primary/20 border-primary'
+                            : 'hover:bg-white/10 dark:hover:bg-white/10'
+                        )}
+                        onClick={() => setSelectedModelAvatar(avatar)}
+                      >
+                        {avatar}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
         )}
       </div>
-
-      {mode === 'lookbook' && (
-        <>
-          <Separator className="bg-white/10 dark:bg-white/10" />
-          <div className="space-y-4">
-            <h3 className="text-lg font-headline">Model Selection</h3>
-            <RadioGroup
-              value={selectedGender}
-              onValueChange={(value: string) =>
-                setSelectedGender(value as Gender)
-              }
-              className="mt-2 grid grid-cols-2 gap-4"
-              disabled={!!modelImage}
-            >
-              <div>
-                <RadioGroupItem value="Male" id="male" className="sr-only" />
-                <Label htmlFor="male" className={cn( 'flex items-center justify-center p-2 rounded-md cursor-pointer', selectedGender === 'Male' ? 'bg-primary text-primary-foreground' : 'bg-white/10 dark:bg-white/10')}>
-                  Male
-                </Label>
-              </div>
-              <div>
-                <RadioGroupItem value="Female" id="female" className="sr-only" />
-                <Label htmlFor="female" className={cn('flex items-center justify-center p-2 rounded-md cursor-pointer', selectedGender === 'Female' ? 'bg-primary text-primary-foreground' : 'bg-white/10 dark:bg-white/10')}>
-                  Female
-                </Label>
-              </div>
-            </RadioGroup>
-            <div className="grid grid-cols-3 gap-2">
-              {currentModels.map((avatar) => (
-                <button
-                  key={avatar}
-                  onClick={() => setSelectedAvatar(avatar)}
-                  disabled={!!modelImage}
-                  className={cn(
-                    'aspect-square text-4xl rounded-lg transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed',
-                    selectedAvatar === avatar && !modelImage
-                      ? 'bg-primary/20 ring-2 ring-primary'
-                      : 'bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10'
-                  )}
-                >
-                  {avatar}
-                </button>
-              ))}
-            </div>
-          </div>
-        </>
-      )}
 
       <Separator className="bg-white/10 dark:bg-white/10" />
 
@@ -319,6 +398,24 @@ export default function ProductStudioPage() {
             </SelectContent>
           </Select>
         </div>
+        <div className="space-y-2">
+          <Label htmlFor="ratio-select">Image Aspect Ratio</Label>
+          <Select value={imageRatio} onValueChange={(value: ImageRatio) => setImageRatio(value)}>
+            <SelectTrigger id="ratio-select">
+              <SelectValue placeholder="Select aspect ratio" />
+            </SelectTrigger>
+            <SelectContent>
+              {IMAGE_RATIOS.map((ratio) => (
+                <SelectItem key={ratio.value} value={ratio.value}>
+                  <div className="flex flex-col">
+                    <span>{ratio.label}</span>
+                    <span className="text-xs text-muted-foreground">{ratio.description}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="space-y-4">
           <div className="flex justify-between items-center">
             <Label htmlFor="num-images-slider">Number of Images</Label>
@@ -334,7 +431,7 @@ export default function ProductStudioPage() {
           />
         </div>
       </div>
-      
+
       <Button
         size="lg"
         className="w-full text-lg font-headline bg-accent hover:bg-accent/90 text-accent-foreground"
@@ -350,49 +447,56 @@ export default function ProductStudioPage() {
       </Button>
     </GlassCard>
   );
-  
+
   const ResultsPanel = () => (
      <GlassCard className="p-6 min-h-[60vh]">
-      <h2 className="font-headline text-3xl mb-6">Results</h2>
-       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      <h2 className="font-headline text-3xl mb-6">300-Word Prompts</h2>
+       <div className="space-y-4">
         {isLoading &&
           Array.from({ length: numImages }).map((_, i) => (
-            <Skeleton key={i} className="aspect-[3/4] rounded-lg" />
+            <Skeleton key={i} className="h-32 rounded-lg" />
           ))}
-        {!isLoading && generatedImages.length === 0 && (
-             <div className="col-span-full flex flex-col items-center justify-center text-center text-muted-foreground p-12 space-y-4 border-2 border-dashed rounded-lg">
+        {!isLoading && generatedPrompts.length === 0 && (
+             <div className="flex flex-col items-center justify-center text-center text-muted-foreground p-12 space-y-4 border-2 border-dashed rounded-lg">
                 <Sparkles className="w-16 h-16"/>
-                <h3 className="text-xl font-headline">Your creations will appear here</h3>
-                <p>Configure your settings on the left and start generating!</p>
+                <h3 className="text-xl font-headline">Your 300-word prompts will appear here</h3>
+                <p>Upload a product image and generate detailed 300-word prompts with "see image attached" references!</p>
             </div>
         )}
         {!isLoading &&
-          generatedImages.map((src, i) => (
+          generatedPrompts.map((prompt, i) => (
             <Card
               key={i}
-              className="overflow-hidden group relative border-0 bg-transparent"
+              className="p-4 bg-white/10 dark:bg-white/10 border border-white/20 dark:border-white/20"
             >
-              <CardContent className="p-0">
-                <Image
-                  src={src}
-                  alt={`Generated image ${i + 1}`}
-                  width={450}
-                  height={600}
-                  data-ai-hint="product photo"
-                  className="aspect-[3/4] w-full h-auto object-cover rounded-lg transition-transform duration-300 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                  <Button asChild size="icon">
-                    <a
-                      href={src}
-                      download={`gemini-product-studio-${productImage?.name}-${i+1}.png`}
-                      aria-label="Download image"
-                    >
-                      <Download />
-                    </a>
-                  </Button>
+              <div className="flex justify-between items-start gap-4">
+                <div className="flex-1">
+                  <h3 className="font-semibold mb-2 text-sm opacity-75">
+                    Prompt {i + 1} of {generatedPrompts.length}
+                  </h3>
+                  <p className="text-sm leading-relaxed whitespace-pre-wrap">
+                    {prompt}
+                  </p>
                 </div>
-              </CardContent>
+                <Button
+                  size="sm"
+                  onClick={() => handleCopyPrompt(prompt, i)}
+                  variant="outline"
+                  className="shrink-0 bg-white/10 hover:bg-white/20 border-white/20"
+                >
+                  {copiedIndex === i ? (
+                    <>
+                      <Check className="h-4 w-4 mr-2" />
+                      Copied
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4 mr-2" />
+                      Copy
+                    </>
+                  )}
+                </Button>
+              </div>
             </Card>
           ))}
       </div>
@@ -408,11 +512,13 @@ export default function ProductStudioPage() {
       <div className="max-w-screen-2xl mx-auto">
         <header className="mb-8 flex justify-between items-center">
           <h1 className="text-4xl font-headline tracking-tight">
-            Gemini Product Studio
+            Product Image Promt Generator
           </h1>
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
-              {apiStatus === null ? (
+              {isCheckingApi ? (
+                <Loader className="animate-spin text-muted-foreground" />
+              ) : apiStatus === null ? (
                 <Loader className="animate-spin text-muted-foreground" />
               ) : apiStatus.isConnected ? (
                 <>
@@ -422,9 +528,25 @@ export default function ProductStudioPage() {
               ) : (
                 <>
                   <XCircle className="text-red-400" />
-                  <span className="text-sm text-red-400">API Disconnected</span>
+                  <span className="text-sm text-red-400">
+                    API Disconnected
+                    {apiStatus.message && (
+                      <span className="block text-xs opacity-75">
+                        {apiStatus.message}
+                      </span>
+                    )}
+                  </span>
                 </>
               )}
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={handleRefreshApiStatus}
+                disabled={isCheckingApi}
+                className="h-6 w-6 p-0"
+              >
+                <RefreshCw className={`h-3 w-3 ${isCheckingApi ? 'animate-spin' : ''}`} />
+              </Button>
             </div>
             <div className='flex items-center space-x-2'>
                 <Sun className='h-5 w-5' />
@@ -450,5 +572,3 @@ export default function ProductStudioPage() {
     </div>
   );
 }
-
-    
