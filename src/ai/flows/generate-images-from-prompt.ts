@@ -49,7 +49,7 @@ const generateImagesFromPromptFlow = ai.defineFlow(
 
     for (let i = 0; i < input.numImages; i++) {
         imagePromises.push(ai.generate({
-            model: 'googleai/gemini-2.5-flash-image-preview',
+            model: 'googleai/gemini-2.0-flash-image-preview',
             prompt: [
               {media: {url: input.productImageDataUri}},
               {text: input.prompt},
