@@ -10,6 +10,8 @@ import {
   Sparkles,
   Download,
   PartyPopper,
+  Moon,
+  Sun,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -28,6 +30,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
+import { Switch } from '@/components/ui/switch';
 
 import { ImageUpload } from '@/components/image-upload';
 import { displayApiStatus } from '@/ai/flows/display-api-status';
@@ -35,6 +38,7 @@ import { generateImagesFromPrompt } from '@/ai/flows/generate-images-from-prompt
 
 type Mode = 'lookbook' | 'b-roll';
 type Gender = 'Male' | 'Female';
+type ThemeMode = 'dark' | 'light';
 
 const THEMES = [
   'Studio Professional', 'Urban Street Style', 'Outdoor Lifestyle', 'Minimalist & Artsy',
@@ -53,7 +57,8 @@ const GlassCard: FC<{ children: React.ReactNode; className?: string }> = ({
 }) => (
   <div
     className={cn(
-      'bg-black/20 backdrop-blur-md rounded-2xl border border-white/10 shadow-lg transition-all duration-300',
+      'bg-black/20 dark:bg-black/20 backdrop-blur-md rounded-2xl border border-white/10 dark:border-white/10 shadow-lg transition-all duration-300',
+      'dark:text-white text-black',
       className
     )}
   >
@@ -63,6 +68,7 @@ const GlassCard: FC<{ children: React.ReactNode; className?: string }> = ({
 
 export default function ProductStudioPage() {
   const { toast } = useToast();
+  const [themeMode, setThemeMode] = useState<ThemeMode>('dark');
   const [mode, setMode] = useState<Mode>('lookbook');
   const [productImage, setProductImage] = useState<{
     data: string;
@@ -85,6 +91,10 @@ export default function ProductStudioPage() {
     isConnected: boolean;
     message?: string;
   } | null>(null);
+
+  useEffect(() => {
+    document.documentElement.className = themeMode;
+  }, [themeMode]);
 
   useEffect(() => {
     const checkApi = async () => {
@@ -187,7 +197,7 @@ export default function ProductStudioPage() {
               'p-4 rounded-lg border-2 text-center cursor-pointer transition-all',
               mode === 'lookbook'
                 ? 'bg-primary/20 border-primary'
-                : 'border-transparent hover:bg-white/10'
+                : 'border-transparent hover:bg-white/10 dark:hover:bg-white/10'
             )}
           >
             <RadioGroupItem value="lookbook" id="lookbook" className="sr-only" />
@@ -199,7 +209,7 @@ export default function ProductStudioPage() {
               'p-4 rounded-lg border-2 text-center cursor-pointer transition-all',
               mode === 'b-roll'
                 ? 'bg-primary/20 border-primary'
-                : 'border-transparent hover:bg-white/10'
+                : 'border-transparent hover:bg-white/10 dark:hover:bg-white/10'
             )}
           >
             <RadioGroupItem value="b-roll" id="b-roll" className="sr-only" />
@@ -208,7 +218,7 @@ export default function ProductStudioPage() {
         </RadioGroup>
       </div>
 
-      <Separator className="bg-white/10" />
+      <Separator className="bg-white/10 dark:bg-white/10" />
 
       <div className="space-y-4">
         <h3 className="text-lg font-headline">Uploads</h3>
@@ -230,7 +240,7 @@ export default function ProductStudioPage() {
 
       {mode === 'lookbook' && (
         <>
-          <Separator className="bg-white/10" />
+          <Separator className="bg-white/10 dark:bg-white/10" />
           <div className="space-y-4">
             <h3 className="text-lg font-headline">Model Selection</h3>
             <RadioGroup
@@ -243,13 +253,13 @@ export default function ProductStudioPage() {
             >
               <div>
                 <RadioGroupItem value="Male" id="male" className="sr-only" />
-                <Label htmlFor="male" className={cn( 'flex items-center justify-center p-2 rounded-md cursor-pointer', selectedGender === 'Male' ? 'bg-primary text-primary-foreground' : 'bg-white/10')}>
+                <Label htmlFor="male" className={cn( 'flex items-center justify-center p-2 rounded-md cursor-pointer', selectedGender === 'Male' ? 'bg-primary text-primary-foreground' : 'bg-white/10 dark:bg-white/10')}>
                   Male
                 </Label>
               </div>
               <div>
                 <RadioGroupItem value="Female" id="female" className="sr-only" />
-                <Label htmlFor="female" className={cn('flex items-center justify-center p-2 rounded-md cursor-pointer', selectedGender === 'Female' ? 'bg-primary text-primary-foreground' : 'bg-white/10')}>
+                <Label htmlFor="female" className={cn('flex items-center justify-center p-2 rounded-md cursor-pointer', selectedGender === 'Female' ? 'bg-primary text-primary-foreground' : 'bg-white/10 dark:bg-white/10')}>
                   Female
                 </Label>
               </div>
@@ -264,7 +274,7 @@ export default function ProductStudioPage() {
                     'aspect-square text-4xl rounded-lg transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed',
                     selectedAvatar === avatar && !modelImage
                       ? 'bg-primary/20 ring-2 ring-primary'
-                      : 'bg-white/5 hover:bg-white/10'
+                      : 'bg-white/5 dark:bg-white/5 hover:bg-white/10 dark:hover:bg-white/10'
                   )}
                 >
                   {avatar}
@@ -275,7 +285,7 @@ export default function ProductStudioPage() {
         </>
       )}
 
-      <Separator className="bg-white/10" />
+      <Separator className="bg-white/10 dark:bg-white/10" />
 
       <div className="space-y-4">
         <h3 className="text-lg font-headline">Customization</h3>
@@ -390,26 +400,41 @@ export default function ProductStudioPage() {
   );
 
   return (
-    <div className="min-h-screen w-full bg-gradient-to-br from-[#667eea] to-[#764ba2] text-white p-4 sm:p-6 lg:p-8">
+    <div className={cn(
+      "min-h-screen w-full p-4 sm:p-6 lg:p-8",
+      "bg-gradient-to-br from-[#ebeff9] to-[#d6e0f5] text-slate-800",
+      "dark:from-[#667eea] dark:to-[#764ba2] dark:text-white"
+      )}>
       <div className="max-w-screen-2xl mx-auto">
         <header className="mb-8 flex justify-between items-center">
           <h1 className="text-4xl font-headline tracking-tight">
             Gemini Product Studio
           </h1>
-          <div className="flex items-center space-x-2">
-            {apiStatus === null ? (
-              <Loader className="animate-spin text-muted-foreground" />
-            ) : apiStatus.isConnected ? (
-              <>
-                <CheckCircle2 className="text-green-400" />
-                <span className="text-sm text-green-400">API Connected</span>
-              </>
-            ) : (
-              <>
-                <XCircle className="text-red-400" />
-                <span className="text-sm text-red-400">API Disconnected</span>
-              </>
-            )}
+          <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-2">
+              {apiStatus === null ? (
+                <Loader className="animate-spin text-muted-foreground" />
+              ) : apiStatus.isConnected ? (
+                <>
+                  <CheckCircle2 className="text-green-400" />
+                  <span className="text-sm text-green-400">API Connected</span>
+                </>
+              ) : (
+                <>
+                  <XCircle className="text-red-400" />
+                  <span className="text-sm text-red-400">API Disconnected</span>
+                </>
+              )}
+            </div>
+            <div className='flex items-center space-x-2'>
+                <Sun className='h-5 w-5' />
+                <Switch
+                  checked={themeMode === 'dark'}
+                  onCheckedChange={() => setThemeMode(themeMode === 'light' ? 'dark' : 'light')}
+                  aria-label="Toggle theme"
+                />
+                <Moon className='h-5 w-5' />
+            </div>
           </div>
         </header>
 
@@ -425,3 +450,5 @@ export default function ProductStudioPage() {
     </div>
   );
 }
+
+    

@@ -69,7 +69,7 @@ export function ImageUpload({
 
   if (preview) {
     return (
-      <div className="relative group w-full aspect-square rounded-lg overflow-hidden border-2 border-dashed border-white/20">
+      <div className="relative group w-full aspect-square rounded-lg overflow-hidden border-2 border-dashed border-white/20 dark:border-white/20">
         <Image src={preview} alt="Preview" fill className="object-cover" />
         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
           <Button
@@ -96,8 +96,8 @@ export function ImageUpload({
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       className={cn(
-        'w-full aspect-video rounded-lg border-2 border-dashed border-white/20 flex flex-col items-center justify-center text-center cursor-pointer transition-colors',
-        isDragging ? 'bg-primary/20 border-primary' : 'hover:bg-white/10'
+        'w-full aspect-video rounded-lg border-2 border-dashed border-white/20 dark:border-white/20 flex flex-col items-center justify-center text-center cursor-pointer transition-colors',
+        isDragging ? 'bg-primary/20 border-primary' : 'hover:bg-white/10 dark:hover:bg-white/10'
       )}
     >
       <input
@@ -117,3 +117,5 @@ export function ImageUpload({
     </div>
   );
 }
+
+    
